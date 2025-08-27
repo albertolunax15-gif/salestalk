@@ -17,16 +17,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { emitSaleCreated } from "@/lib/salesBus";
 
-declare global {
-  interface Window {
-    webkitSpeechRecognition?: unknown;
-    SpeechRecognition?: unknown;
-  }
-}
-
 export type Language = { code: string; name: string };
 
-// ⚠️ Tipo EXACTO que tu nlpClient espera
+// Tipo EXACTO que tu nlpClient espera
 type StrictPaymentMethod = "Efectivo" | "Tarjeta" | "Yape" | "Plin" | "Transferencia";
 
 // Normaliza cualquier string a uno de los 5 valores válidos
@@ -58,7 +51,7 @@ type Entities = {
   product_id?: string;
   product_name?: string;
   quantity?: number;
-  payment_method?: string; // ← string libre; luego lo normalizamos a StrictPaymentMethod al enviar
+  payment_method?: string; // string libre; lo normalizamos al enviar
   date?: string; // ISO
   _candidates?: Candidate[];
 };
@@ -220,7 +213,7 @@ export default function VoiceRecognizer({
     try {
       const quantity = nlpResult?.entities.quantity ?? 1;
 
-      // 🔥 AQUÍ la clave: normalizamos a las 5 cadenas exactas que nlpClient exige
+      // Normalizamos a las 5 cadenas exactas que nlpClient exige
       const paymentMethod: StrictPaymentMethod = normalizePaymentMethod(
         nlpResult?.entities.payment_method
       );
@@ -235,7 +228,7 @@ export default function VoiceRecognizer({
         token,
         productId: selectedProductId,
         quantity,
-        paymentMethod, // ← ahora coincide EXACTO con el tipo del cliente
+        paymentMethod, // tipo exacto
         date: dateIso,
       });
 
@@ -280,10 +273,9 @@ export default function VoiceRecognizer({
 
     const q = nlpResult.entities.quantity ?? 1;
 
-    // Para mostrar al usuario, puedes enseñar el string crudo o el normalizado
+    // Para mostrar al usuario
     const pmDisplay =
-      nlpResult.entities.payment_method ??
-      normalizePaymentMethod(undefined); // "Efectivo"
+      nlpResult.entities.payment_method ?? normalizePaymentMethod(undefined); // "Efectivo"
 
     return (
       <div className="space-y-2">
@@ -359,7 +351,6 @@ export default function VoiceRecognizer({
               onStart={start}
               onStop={stop}
               onClear={() => {
-                // limpia estados
                 clear();
                 setNlpError(null);
                 setNlpResult(null);

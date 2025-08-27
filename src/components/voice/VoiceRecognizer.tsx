@@ -330,46 +330,55 @@ export default function VoiceRecognizer({
   }, [nlpResult, selectedProductId, confirming, confirmError]);
 
   return (
-    <Card className={`bg-white shadow-lg ${className ?? ""} max-h-[80vh] overflow-hidden`}>
-      <CardHeader className="border-b p-3">
-        <div className="flex items-center justify-between gap-3">
+    <Card
+      className={`bg-white shadow-lg ${className ?? ""} w-full max-w-full h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden`}
+    >
+      <CardHeader className="border-b p-3 shrink-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <CardTitle className="text-lg md:text-xl font-semibold">{title}</CardTitle>
-          <div className="flex items-center gap-2">
-            <LanguageSelector lang={lang} languages={languages} onLanguageChange={setLang} />
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex-1 sm:flex-none">
+              <LanguageSelector lang={lang} languages={languages} onLanguageChange={setLang} />
+            </div>
             <RecognitionStatus supported={supported} isListening={isListening} />
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
-          {/* Izquierda */}
-          <div className="flex min-h-0 flex-col gap-3">
-            <ActionButtons
-              supported={supported}
-              isListening={isListening}
-              onStart={start}
-              onStop={stop}
-              onClear={() => {
-                clear();
-                setNlpError(null);
-                setNlpResult(null);
-                setConfirmError(null);
-                setSelectedProductId(null);
-              }}
-              onSendToNLP={handleSendToNLP}
-              canSend={canSend}
-              sending={sending}
-            />
+      <CardContent className="p-4 flex-1 min-h-0 overflow-hidden">
+        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-4 h-full">
+          {/* Izquierda: Controles y transcripción */}
+          <div className="flex flex-col gap-3 min-h-0 lg:min-h-full">
+            <div className="shrink-0">
+              <ActionButtons
+                supported={supported}
+                isListening={isListening}
+                onStart={start}
+                onStop={stop}
+                onClear={() => {
+                  clear();
+                  setNlpError(null);
+                  setNlpResult(null);
+                  setConfirmError(null);
+                  setSelectedProductId(null);
+                }}
+                onSendToNLP={handleSendToNLP}
+                canSend={canSend}
+                sending={sending}
+              />
+            </div>
 
             {!supported && (
-              <div className="text-sm text-red-600 p-3 bg-red-50 rounded-md flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
+              <div className="text-sm text-red-600 p-3 bg-red-50 rounded-md flex items-center gap-2 shrink-0">
+                <AlertCircle className="h-4 w-4 shrink-0" />
                 Tu navegador/entorno no permite Web Speech API. Usa Chrome/Edge en escritorio y HTTPS (o localhost).
               </div>
             )}
 
-            <div className="min-h-[220px] md:min-h-[280px] max-h-[48vh] overflow-y-auto rounded border bg-white p-3 space-y-2">
+            <div
+              className="flex-1 min-h-[200px] lg:min-h-[280px] overflow-y-auto rounded border bg-white p-3 space-y-2 overscroll-contain touch-pan-y touch-scroll"
+              tabIndex={0}
+            >
               <ErrorDisplay errorMsg={errorMsg} />
               {confidence !== null && (
                 <div className="text-xs text-gray-500">
@@ -379,14 +388,17 @@ export default function VoiceRecognizer({
               <TranscriptDisplay finalText={finalText} interimText={interim} />
             </div>
 
-            <div className="text-xs text-gray-500 p-2 bg-blue-50 rounded-md">
+            <div className="text-xs text-gray-500 p-2 bg-blue-50 rounded-md shrink-0">
               <strong>Consejo:</strong> Ejecuta en HTTPS (o localhost). En Brave, desactiva <em>Shields</em> o usa Chrome/Edge.
             </div>
           </div>
 
-          {/* Derecha */}
-          <div className="flex min-h-0 flex-col">
-            <div className="min-h-[220px] md:min-h-[280px] max-h-[48vh] overflow-y-auto rounded border bg-white p-3">
+          {/* Derecha: Resultado NLP */}
+          <div className="flex flex-col min-h-0 lg:min-h-full">
+            <div
+              className="flex-1 min-h-[200px] lg:min-h-[280px] overflow-y-auto rounded border bg-white p-3 overscroll-contain touch-pan-y touch-scroll"
+              tabIndex={0}
+            >
               {nlpError && (
                 <div className="mb-3 p-3 rounded bg-red-50 text-red-700 text-sm">
                   {nlpError}
@@ -400,13 +412,12 @@ export default function VoiceRecognizer({
               ) : (
                 <div className="text-sm space-y-3">
                   <div>
-                    <strong>Intent:</strong> {nlpResult.intent} (
-                    {Math.round((nlpResult.confidence ?? 0) * 100)}%)
+                    <strong>Intent:</strong> {nlpResult.intent} ({Math.round((nlpResult.confidence ?? 0) * 100)}%)
                   </div>
 
                   <div>
                     <strong>Entities:</strong>
-                    <pre className="mt-1 text-xs overflow-auto max-h-40 border rounded bg-gray-50 p-2">
+                    <pre className="mt-1 text-xs overflow-auto max-h-40 sm:max-h-48 border rounded bg-gray-50 p-2 overscroll-contain touch-pan-x touch-pan-y font-mono whitespace-pre-wrap break-words">
                       {JSON.stringify(nlpResult.entities, null, 2)}
                     </pre>
                   </div>

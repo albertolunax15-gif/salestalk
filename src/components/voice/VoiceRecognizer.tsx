@@ -376,7 +376,7 @@ export default function VoiceRecognizer({
             )}
 
             <div
-              className="flex-1 min-h-[200px] lg:min-h-[280px] overflow-y-auto rounded border bg-white p-3 space-y-2 overscroll-contain touch-pan-y touch-scroll"
+              className="flex-1 min-h-[200px] lg:min-h-[280px] overflow-y-auto overflow-x-hidden rounded border bg-white p-3 space-y-2 overscroll-contain touch-pan-y"
               tabIndex={0}
             >
               <ErrorDisplay errorMsg={errorMsg} />
@@ -396,7 +396,7 @@ export default function VoiceRecognizer({
           {/* Derecha: Resultado NLP */}
           <div className="flex flex-col min-h-0 lg:min-h-full">
             <div
-              className="flex-1 min-h-[200px] lg:min-h-[280px] overflow-y-auto rounded border bg-white p-3 overscroll-contain touch-pan-y touch-scroll"
+              className="flex-1 min-h-[200px] lg:min-h-[280px] overflow-y-auto overflow-x-hidden rounded border bg-white p-3 overscroll-contain touch-pan-y"
               tabIndex={0}
             >
               {nlpError && (
@@ -417,7 +417,14 @@ export default function VoiceRecognizer({
 
                   <div>
                     <strong>Entities:</strong>
-                    <pre className="mt-1 text-xs overflow-auto max-h-40 sm:max-h-48 border rounded bg-gray-50 p-2 overscroll-contain touch-pan-x touch-pan-y font-mono whitespace-pre-wrap break-words">
+                    <pre
+                      className="mt-1 text-xs max-h-40 sm:max-h-48 border rounded bg-gray-50 p-2
+                                 overflow-x-auto overflow-y-auto overscroll-contain
+                                 touch-pan-x font-mono whitespace-pre"
+                      role="region"
+                      aria-label="Entities (scroll horizontal)"
+                      tabIndex={0}
+                    >
                       {JSON.stringify(nlpResult.entities, null, 2)}
                     </pre>
                   </div>

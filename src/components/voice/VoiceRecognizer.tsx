@@ -100,13 +100,9 @@ function errorMessage(e: unknown): string {
 }
 
 // Convierte candidates mixtos a string[] (id o name) para la firma actual de nlpInterpret
-function normalizeCandidates(
-  input?: Array<string | Candidate>
-): string[] | undefined {
+function normalizeCandidates(input?: Array<string | Candidate>): string[] | undefined {
   if (!input) return undefined;
-  const out = input
-    .map((c) => (typeof c === "string" ? c : c.id || c.name))
-    .filter((v): v is string => Boolean(v));
+  const out = input.map((c) => (typeof c === "string" ? c : c.id || c.name)).filter((v): v is string => Boolean(v));
   return out.length ? out : undefined;
 }
 
@@ -134,24 +130,13 @@ export default function VoiceRecognizer({
   const { token } = useAuth();
   const { toast } = useToast();
 
-  const {
-    supported,
-    isListening,
-    interim,
-    finalText,
-    lang,
-    setLang,
-    errorMsg,
-    confidence,
-    start,
-    stop,
-    clear,
-  } = useSpeechRecognition({
-    initialLang,
-    onFinalText,
-    onInterimText,
-    autoRestart,
-  });
+  const { supported, isListening, interim, finalText, lang, setLang, errorMsg, confidence, start, stop, clear } =
+    useSpeechRecognition({
+      initialLang,
+      onFinalText,
+      onInterimText,
+      autoRestart,
+    });
 
   // Estado
   const [sending, setSending] = useState(false);
@@ -162,7 +147,21 @@ export default function VoiceRecognizer({
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
+  // 👇 Nuevo: estado para mantener layout tras confirmar
+  const [justConfirmed, setJustConfirmed] = useState(false);
+  const [lastSale, setLastSale] = useState<SaleCreated | null>(null);
+
   const canSend = Boolean(finalText?.trim() && token);
+
+  const resetForm = () => {
+    clear();
+    setNlpError(null);
+    setNlpResult(null);
+    setConfirmError(null);
+    setSelectedProductId(null);
+    setJustConfirmed(false);
+    setLastSale(null);
+  };
 
   // Interpretación
   const handleSendToNLP = async (): Promise<void> => {
@@ -175,9 +174,8 @@ export default function VoiceRecognizer({
 
     setSending(true);
     setNlpError(null);
-    setNlpResult(null);
     setConfirmError(null);
-    setSelectedProductId(null);
+    setJustConfirmed(false); // si re-interpretas, vuelves al estado normal
 
     try {
       const resp = await nlpInterpret({
@@ -186,7 +184,7 @@ export default function VoiceRecognizer({
         candidateProducts: normalizeCandidates(candidateProducts),
       });
 
-      const parsed = resp as NLPInterpretResponse; // tipado del cliente
+      const parsed = resp as NLPInterpretResponse;
       setNlpResult(parsed);
 
       const pid = parsed.entities.product_id ?? null;
@@ -212,35 +210,23 @@ export default function VoiceRecognizer({
 
     try {
       const quantity = nlpResult?.entities.quantity ?? 1;
-
-      // Normalizamos a las 5 cadenas exactas que nlpClient exige
-      const paymentMethod: StrictPaymentMethod = normalizePaymentMethod(
-        nlpResult?.entities.payment_method
-      );
-
+      const paymentMethod: StrictPaymentMethod = normalizePaymentMethod(nlpResult?.entities.payment_method);
       const dateIso: string | undefined = nlpResult?.entities.date;
 
-      if (!selectedProductId) {
-        throw new Error("Selecciona un producto para confirmar.");
-      }
+      if (!selectedProductId) throw new Error("Selecciona un producto para confirmar.");
 
       const saleResp = await nlpConfirmSale({
         token,
         productId: selectedProductId,
         quantity,
-        paymentMethod, // tipo exacto
+        paymentMethod,
         date: dateIso,
       });
 
       const sale: SaleCreated = saleResp as SaleCreated;
 
-      const cands: Candidate[] =
-        nlpResult?.candidates ?? nlpResult?.entities._candidates ?? [];
-
-      const productName =
-        cands.find((c) => c.id === selectedProductId)?.name ??
-        nlpResult?.entities.product_name ??
-        "Producto";
+      const cands: Candidate[] = nlpResult?.candidates ?? nlpResult?.entities._candidates ?? [];
+      const productName = cands.find((c) => c.id === selectedProductId)?.name ?? nlpResult?.entities.product_name ?? "Producto";
 
       toast({
         title: "Venta creada",
@@ -249,10 +235,13 @@ export default function VoiceRecognizer({
 
       emitSaleCreated(sale);
       onSaleCreated?.(sale);
-      onClose?.();
+
+      // ✅ Mantener layout: no cerramos ni borramos todo; mostramos estado "justConfirmed"
+      setLastSale(sale);
+      setJustConfirmed(true);
+
+      // Opcional: limpiar solo la transcripción para nueva orden por voz
       clear();
-      setNlpResult(null);
-      setSelectedProductId(null);
     } catch (e: unknown) {
       setConfirmError(errorMessage(e));
     } finally {
@@ -260,25 +249,56 @@ export default function VoiceRecognizer({
     }
   };
 
-  // Panel de confirmación
-  const confirmPanel = useMemo(() => {
-    if (!nlpResult) return null;
-    if (nlpResult.intent !== "crear_venta") return null;
+  // Footer de acciones (sticky) — permanece montado siempre para evitar saltos
+  const ConfirmFooter = ({
+    disabled,
+  }: {
+    disabled: boolean;
+  }) => {
+    return (
+      <div
+        className="sticky bottom-0 z-10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80
+                   border-t h-16 flex items-center gap-2"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        {justConfirmed ? (
+          <>
+            <Button variant="secondary" className="w-full sm:w-auto" onClick={resetForm}>
+              Nueva venta
+            </Button>
+            {onClose && (
+              <Button className="w-full sm:w-auto" onClick={onClose}>
+                Cerrar
+              </Button>
+            )}
+          </>
+        ) : (
+          <Button className="w-full sm:w-auto" onClick={handleConfirm} disabled={disabled}>
+            {confirming ? "Confirmando..." : "Confirmar venta"}
+          </Button>
+        )}
+      </div>
+    );
+  };
 
-    const needs =
-      Boolean(nlpResult.needs_confirmation) || !nlpResult.entities.product_id;
+  // Panel de confirmación (contenido; el footer siempre está)
+  const confirmPanelBody = useMemo(() => {
+    if (!nlpResult || nlpResult.intent !== "crear_venta") return null;
 
-    const cands: Candidate[] =
-      nlpResult.candidates ?? nlpResult.entities._candidates ?? [];
-
+    const needs = Boolean(nlpResult.needs_confirmation) || !nlpResult.entities.product_id;
+    const cands: Candidate[] = nlpResult.candidates ?? nlpResult.entities._candidates ?? [];
     const q = nlpResult.entities.quantity ?? 1;
-
-    // Para mostrar al usuario
-    const pmDisplay =
-      nlpResult.entities.payment_method ?? normalizePaymentMethod(undefined); // "Efectivo"
+    const pmDisplay = nlpResult.entities.payment_method ?? normalizePaymentMethod(undefined);
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
+        {/* Estado después de confirmar, mostramos un pequeño resumen */}
+        {justConfirmed && lastSale && (
+          <div className="p-2 rounded bg-green-50 text-green-800 text-sm">
+            Venta #{lastSale.id.slice(0, 8)} creada correctamente.
+          </div>
+        )}
+
         <div className="text-sm">
           <strong>Resumen:</strong> {q} unidad(es) — Pago: {pmDisplay}
         </div>
@@ -290,6 +310,7 @@ export default function VoiceRecognizer({
               className="w-full border rounded p-2 text-sm"
               value={selectedProductId ?? ""}
               onChange={(e) => setSelectedProductId(e.target.value || null)}
+              disabled={justConfirmed}
             >
               <option value="">-- Elegir producto --</option>
               {cands.map((c) => (
@@ -299,40 +320,20 @@ export default function VoiceRecognizer({
                 </option>
               ))}
             </select>
-
-            <div className="pt-1">
-              <Button onClick={handleConfirm} disabled={!selectedProductId || confirming}>
-                {confirming ? "Confirmando..." : "Confirmar venta"}
-              </Button>
-            </div>
           </>
         ) : (
-          <>
-            <div className="text-sm">
-              Producto:{" "}
-              <span className="font-medium">
-                {nlpResult.entities.product_name ?? "—"}
-              </span>
-            </div>
-            <Button onClick={handleConfirm} disabled={confirming || !selectedProductId}>
-              {confirming ? "Confirmando..." : "Confirmar venta"}
-            </Button>
-          </>
-        )}
-
-        {confirmError && (
-          <div className="text-sm text-red-700 bg-red-50 p-2 rounded">
-            {confirmError}
+          <div className="text-sm">
+            Producto: <span className="font-medium">{nlpResult.entities.product_name ?? "—"}</span>
           </div>
         )}
+
+        {confirmError && <div className="text-sm text-red-700 bg-red-50 p-2 rounded">{confirmError}</div>}
       </div>
     );
-  }, [nlpResult, selectedProductId, confirming, confirmError]);
+  }, [nlpResult, selectedProductId, confirmError, justConfirmed, lastSale]);
 
   return (
-    <Card
-      className={`bg-white shadow-lg ${className ?? ""} w-full max-w-full h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden`}
-    >
+    <Card className={`bg-white shadow-lg ${className ?? ""} w-full max-w-full h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden`}>
       <CardHeader className="border-b p-3 shrink-0">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <CardTitle className="text-lg md:text-xl font-semibold">{title}</CardTitle>
@@ -356,11 +357,7 @@ export default function VoiceRecognizer({
                 onStart={start}
                 onStop={stop}
                 onClear={() => {
-                  clear();
-                  setNlpError(null);
-                  setNlpResult(null);
-                  setConfirmError(null);
-                  setSelectedProductId(null);
+                  resetForm();
                 }}
                 onSendToNLP={handleSendToNLP}
                 canSend={canSend}
@@ -381,9 +378,7 @@ export default function VoiceRecognizer({
             >
               <ErrorDisplay errorMsg={errorMsg} />
               {confidence !== null && (
-                <div className="text-xs text-gray-500">
-                  Confianza última frase: {(confidence * 100).toFixed(1)}%
-                </div>
+                <div className="text-xs text-gray-500">Confianza última frase: {(confidence * 100).toFixed(1)}%</div>
               )}
               <TranscriptDisplay finalText={finalText} interimText={interim} />
             </div>
@@ -396,19 +391,14 @@ export default function VoiceRecognizer({
           {/* Derecha: Resultado NLP */}
           <div className="flex flex-col min-h-0 lg:min-h-full">
             <div
-              className="flex-1 min-h-[200px] lg:min-h-[280px] overflow-y-auto overflow-x-hidden rounded border bg-white p-3 overscroll-contain touch-pan-y"
+              className="flex-1 min-h-[200px] lg:min-h-[280px] overflow-y-auto overflow-x-hidden rounded border bg-white p-3 overscroll-contain touch-pan-y pb-28 sm:pb-8"
+              style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
               tabIndex={0}
             >
-              {nlpError && (
-                <div className="mb-3 p-3 rounded bg-red-50 text-red-700 text-sm">
-                  {nlpError}
-                </div>
-              )}
+              {nlpError && <div className="mb-3 p-3 rounded bg-red-50 text-red-700 text-sm">{nlpError}</div>}
 
               {!nlpResult ? (
-                <div className="text-sm text-gray-500">
-                  Envía el texto reconocido para interpretar la intención.
-                </div>
+                <div className="text-sm text-gray-500">Envía el texto reconocido para interpretar la intención.</div>
               ) : (
                 <div className="text-sm space-y-3">
                   <div>
@@ -435,10 +425,14 @@ export default function VoiceRecognizer({
                     </div>
                   )}
 
-                  {confirmPanel}
+                  {/* Cuerpo del panel (inputs / mensajes) */}
+                  {confirmPanelBody}
                 </div>
               )}
             </div>
+
+            {/* Footer sticky PERMANENTE (previene saltos de tamaño) */}
+            <ConfirmFooter disabled={confirming || !selectedProductId || justConfirmed && !nlpResult} />
           </div>
         </div>
       </CardContent>

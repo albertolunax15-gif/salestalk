@@ -124,9 +124,6 @@ function SalesContent() {
                   {loading ? "Cargando…" : `Ventas (máx. 50) — ${sales?.length ?? 0} registros`}
                 </p>
               </div>
-              <Button variant="outline" onClick={handleRefresh}>
-                Refrescar
-              </Button>
             </div>
 
             <Card className="mt-4 bg-white shadow-lg border rounded-lg overflow-hidden">
@@ -151,13 +148,6 @@ function SalesContent() {
                     total={total}
                   />
                 )}
-
-                <div className="mt-4">
-                  <SalesActions
-                    onClear={handleClear}
-                    onRegisterSale={handleRegisterSale}
-                  />
-                </div>
               </CardContent>
             </Card>
           </div>

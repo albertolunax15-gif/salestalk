@@ -49,4 +49,26 @@ export const saleService = {
     )
     return enriched
   },
+
+  async getSalesReport(token: string) {
+    const url = `${API_BASE_URL}/sales/report`
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    })
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "")
+      throw new Error(`GET /sales/report ${res.status} ${res.statusText} ${text}`)
+    }
+
+    return res.json()
+  }
+
+
 }

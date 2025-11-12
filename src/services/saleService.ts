@@ -68,7 +68,30 @@ export const saleService = {
     }
 
     return res.json()
+  },
+
+  async deleteSale(token: string, id: string): Promise<void> {
+    const url = `${API_BASE_URL}/sales/${encodeURIComponent(id)}`
+    const res = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (res.status === 204) return
+
+    // construimos un mensaje útil
+    let msg = `DELETE /sales/${id} ${res.status} ${res.statusText}`
+    try {
+      const json = await res.json()
+      if (json?.detail) msg = json.detail
+    } catch {
+      // ignore json parse
+    }
+
+    if (res.status === 404) throw new Error("La venta no existe")
+    throw new Error(msg)
   }
-
-
 }

@@ -138,6 +138,34 @@ export default function VoiceRecognizer({
       autoRestart,
     });
 
+  // ======= TTS (mínimo necesario) =======
+  const synth = typeof window !== "undefined" ? window.speechSynthesis : null;
+  function speak(text: string) {
+    if (!synth || !text) return;
+    try {
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      // voz española si existe; si no, la primera disponible
+      const voices = synth.getVoices();
+      const v =
+        voices.find((vv) => vv.lang?.toLowerCase() === "es-pe") ||
+        voices.find((vv) => vv.lang?.toLowerCase() === "es-es") ||
+        voices.find((vv) => vv.lang?.toLowerCase().startsWith("es-")) ||
+        voices[0] ||
+        null;
+      if (v) u.voice = v;
+      u.lang = v?.lang || "es-ES";
+      u.rate = 1;
+      u.pitch = 1;
+      u.volume = 1;
+      synth.speak(u);
+    } catch {}
+  }
+  function speakAmbigua() {
+    speak("Necesitamos validar los datos antes de crear la venta");
+  }
+  // ======================================
+
   // Estado
   const [sending, setSending] = useState(false);
   const [nlpResult, setNlpResult] = useState<NLPInterpretResponse | null>(null);
@@ -187,6 +215,18 @@ export default function VoiceRecognizer({
       const parsed = resp as NLPInterpretResponse;
       setNlpResult(parsed);
 
+      // === AUDIO: si la interpretación luce ambigua, hablar ===
+      try {
+        const notes = parsed.notes ?? [];
+        const hasAmbWord = notes.some((n) => /ambig(uo|ua|uidad)/i.test(n));
+        const needs = parsed.needs_confirmation === true;
+        const cands = parsed.candidates ?? parsed.entities._candidates ?? [];
+        const missingIdOrMany = !parsed.entities?.product_id && cands.length !== 1; // 0 o >1
+        if (hasAmbWord || needs || missingIdOrMany) {
+          speakAmbigua();
+        }
+      } catch {}
+
       const pid = parsed.entities.product_id ?? null;
       const cands = parsed.candidates ?? parsed.entities._candidates ?? [];
 
@@ -233,6 +273,17 @@ export default function VoiceRecognizer({
         description: `${productName} • ${quantity} unid • ${paymentMethod}`,
       });
 
+      // 👇 NUEVO: voz al crear con éxito
+      try { speak(`Venta creada correctamente`); } catch {}
+
+      emitSaleCreated(sale);
+      onSaleCreated?.(sale);
+
+      // ✅ Mantener layout...
+      setLastSale(sale);
+      setJustConfirmed(true);
+      clear();
+
       emitSaleCreated(sale);
       onSaleCreated?.(sale);
 
@@ -243,6 +294,15 @@ export default function VoiceRecognizer({
       // Opcional: limpiar solo la transcripción para nueva orden por voz
       clear();
     } catch (e: unknown) {
+      // === AUDIO: si el backend sugiere que el producto no existe / ambigüedad ===
+      try {
+        const msg = (typeof e === "string" ? e : (e as any)?.message ?? "").toString().toLowerCase();
+        if (
+          /404|no\s*encontrad[oa]|no\s*existe|producto\s*(in|)valido|ambig|no\s*se\s*pudo\s*resolver/.test(msg)
+        ) {
+          speakAmbigua();
+        }
+      } catch {}
       setConfirmError(errorMessage(e));
     } finally {
       setConfirming(false);
@@ -349,7 +409,7 @@ export default function VoiceRecognizer({
       <CardContent className="p-4 flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-col lg:grid lg:grid-cols-2 gap-4 h-full">
           {/* Izquierda: Controles y transcripción */}
-          <div className="flex flex-col gap-3 min-h-0 lg:min-h-full">
+          <div className="flex flex-col gap-3 min-h-0 lg:minh-full">
             <div className="shrink-0">
               <ActionButtons
                 supported={supported}
@@ -432,7 +492,7 @@ export default function VoiceRecognizer({
             </div>
 
             {/* Footer sticky PERMANENTE (previene saltos de tamaño) */}
-            <ConfirmFooter disabled={confirming || !selectedProductId || justConfirmed && !nlpResult} />
+            <ConfirmFooter disabled={confirming || !selectedProductId || (justConfirmed && !nlpResult)} />
           </div>
         </div>
       </CardContent>

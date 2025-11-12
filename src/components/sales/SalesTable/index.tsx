@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useSales } from "@/hooks/useSales";
 import type { Sale } from "@/services/saleService";
 import { TableRow } from "./TableRow";
@@ -14,7 +14,7 @@ interface SalesTableProps {
 }
 
 export const SalesTable = ({ maxItems = 50 }: SalesTableProps) => {
-  const { sales, loading, error, refetch } = useSales(maxItems);
+  const { sales, loading, error, refetch, deletingId, remove } = useSales(maxItems);
   const [query, setQuery] = useState("");
 
   // 🔁 Auto-refresco cuando se crea una venta
@@ -40,11 +40,9 @@ export const SalesTable = ({ maxItems = 50 }: SalesTableProps) => {
 
   // 🔽 Ordena de reciente → antiguo
   const sorted = useMemo(() => {
-    // copia para no mutar el estado original
     return [...sales].sort((a, b) => {
       const diff = dateToMs(b) - dateToMs(a);
       if (diff !== 0) return diff;
-      // desempate estable por id (opcional)
       return String(b.id).localeCompare(String(a.id));
     });
   }, [sales]);
@@ -62,6 +60,23 @@ export const SalesTable = ({ maxItems = 50 }: SalesTableProps) => {
       return [idText, productText, pmText, dateText, qtyText].some((v) => v.includes(q));
     });
   }, [sorted, query]);
+
+  // 🗑️ Eliminar (confirm + llamada al hook)
+  const handleDelete = useCallback(
+    async (sale: Sale) => {
+      const ok = confirm(
+        `¿Eliminar la venta ${sale.id} (${sale.product_name ?? sale.product_id})?\nEsta acción no se puede deshacer.`
+      );
+      if (!ok) return;
+
+      try {
+        await remove(sale.id);
+      } catch (e: any) {
+        alert(e?.message ?? "No se pudo eliminar la venta");
+      }
+    },
+    [remove]
+  );
 
   return (
     <div className="rounded-lg border bg-white p-4 md:p-6">
@@ -97,11 +112,18 @@ export const SalesTable = ({ maxItems = 50 }: SalesTableProps) => {
                 <th className="px-3 py-2 font-semibold">Cantidad</th>
                 <th className="px-3 py-2 font-semibold">Producto</th>
                 <th className="px-3 py-2 font-semibold">Método de pago</th>
+                {/* 👇 Nueva cabecera */}
+                <th className="px-3 py-2 font-semibold">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((s) => (
-                <TableRow key={String(s.id)} sale={s} />
+                <TableRow
+                  key={String(s.id)}
+                  sale={s}
+                  onDelete={handleDelete}
+                  isDeleting={deletingId === String(s.id)}
+                />
               ))}
             </tbody>
           </table>

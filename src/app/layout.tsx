@@ -7,10 +7,11 @@ import "./globals.css"
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  display: "swap",
 })
 
 export const metadata: Metadata = {
-  title: "SalesTalk - Sistema de Gestión",
+  title: { default: "SalesTalk", template: "%s · SalesTalk" },
   description: "Sistema de gestión de ventas y inventario",
 }
 

@@ -1,141 +1,114 @@
 "use client"
 
 import Image from "next/image"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Mail, Lock, AlertCircle, CheckCircle } from "lucide-react"
 import { useLogin } from "@/hooks/useLogin"
 import { useAuth } from "@/contexts/AuthContext"
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
 
 export function LoginForm() {
   const { formData, authState, handleInputChange, handleSubmit } = useLogin()
   const { isAuthenticated } = useAuth()
   const router = useRouter()
+  const [showPassword, setShowPassword] = useState(false)
 
   // Redirigir si ya está autenticado
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/dashboard')
+      router.replace("/dashboard")
     }
   }, [isAuthenticated, router])
 
   return (
-    <Card className="w-full max-w-md shadow-xl border-primary/20 bg-card/95 backdrop-blur-sm">
-      <CardHeader className="space-y-4 text-center">
-        <div className="flex justify-center">
-          <div className="relative w-20 h-20 rounded-2xl overflow-hidden shadow-lg">
-            <Image 
-              src="/salestalk-logo.png" 
-              alt="SalesTalk Logo" 
-              fill 
-              className="object-cover" 
-              priority
+    <div className="w-full max-w-sm">
+      <div className="mb-8">
+        <div className="relative mb-6 size-12 overflow-hidden rounded-xl shadow-sm ring-1 ring-border lg:hidden">
+          <Image src="/salestalk-logo.png" alt="SalesTalk" fill sizes="48px" className="object-cover" priority />
+        </div>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Inicia sesión</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">Ingresa tus credenciales para acceder al panel.</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        <div className="space-y-2">
+          <Label htmlFor="email">Correo electrónico</Label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="email"
+              type="email"
+              placeholder="tu@empresa.com"
+              value={formData.email}
+              onChange={(e) => handleInputChange("email", e.target.value)}
+              required
+              autoFocus
+              className="h-11 bg-card pl-10"
+              disabled={authState.isLoading}
+              autoComplete="email"
+              aria-invalid={Boolean(authState.error) || undefined}
             />
           </div>
         </div>
+
         <div className="space-y-2">
-          <CardTitle className="text-2xl font-bold text-foreground">
-            Bienvenido a SalesTalk
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Inicia sesión para acceder a tu cuenta
-          </CardDescription>
+          <Label htmlFor="password">Contraseña</Label>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••••"
+              value={formData.password}
+              onChange={(e) => handleInputChange("password", e.target.value)}
+              required
+              className="h-11 bg-card px-10"
+              disabled={authState.isLoading}
+              autoComplete="current-password"
+              aria-invalid={Boolean(authState.error) || undefined}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-pressed={showPassword}
+              className="absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
         </div>
-      </CardHeader>
 
-      <CardContent className="space-y-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Email */}
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium text-foreground">
-              Correo electrónico
-            </Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="email"
-                type="email"
-                placeholder="Correo electrónico"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                required
-                className="pl-10 h-12 bg-input border-border focus:border-primary focus:ring-ring"
-                disabled={authState.isLoading}
-                autoComplete="email"
-              />
-            </div>
-          </div>
-
-          {/* Password */}
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-sm font-medium text-foreground">
-              Contraseña
-            </Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="password"
-                type="password"
-                placeholder="Contraseña"
-                value={formData.password}
-                onChange={(e) => handleInputChange('password', e.target.value)}
-                required
-                className="pl-10 h-12 bg-input border-border focus:border-primary focus:ring-ring"
-                disabled={authState.isLoading}
-                autoComplete="current-password"
-              />
-            </div>
-          </div>
-
-          {/* Mensajes de error */}
+        <div aria-live="polite">
           {authState.error && (
-            <Alert variant="destructive" className="border-destructive/20 bg-destructive/10">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{authState.error}</AlertDescription>
-            </Alert>
+            <div role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{authState.error}</span>
+            </div>
           )}
-
-          {/* Mensajes de éxito */}
           {authState.success && (
-            <Alert className="border-green-500/20 bg-green-500/10">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-700">
-                {authState.success}
-              </AlertDescription>
-            </Alert>
+            <div className="flex items-start gap-2 rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-foreground">
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+              <span>{authState.success}</span>
+            </div>
           )}
-
-          {/* Botón */}
-          <Button
-            type="submit"
-            className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-medium transition-all duration-200 hover:shadow-lg"
-            disabled={authState.isLoading}
-          >
-            {authState.isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Iniciando sesión...
-              </>
-            ) : (
-              "Iniciar sesión"
-            )}
-          </Button>
-        </form>
-
-        <div className="text-center">
-          <button 
-            className="text-sm text-muted-foreground hover:text-primary transition-colors"
-            type="button"
-          >
-            ¿Olvidaste tu contraseña?
-          </button>
         </div>
-      </CardContent>
-    </Card>
+
+        <Button type="submit" size="lg" className="h-11 w-full" disabled={authState.isLoading}>
+          {authState.isLoading ? (
+            <>
+              <Loader2 className="animate-spin" />
+              Ingresando…
+            </>
+          ) : (
+            "Iniciar sesión"
+          )}
+        </Button>
+      </form>
+    </div>
   )
 }

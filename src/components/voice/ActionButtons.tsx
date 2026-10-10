@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button"
-import { Mic, Square, Loader2, Waves, Trash2, Send } from "lucide-react"
+import { Mic, Square, Loader2, RotateCcw, Sparkles } from "lucide-react"
 
 type ActionButtonsProps = {
   supported: boolean
@@ -7,53 +7,46 @@ type ActionButtonsProps = {
   onStart: () => void
   onStop: () => void
   onClear: () => void
-  // 🔽 nuevo:
   onSendToNLP?: () => void
   canSend?: boolean
   sending?: boolean
 }
 
-export const ActionButtons = ({ 
-  supported, 
-  isListening, 
-  onStart, 
-  onStop, 
+export const ActionButtons = ({
+  supported,
+  isListening,
+  onStart,
+  onStop,
   onClear,
   onSendToNLP,
   canSend = false,
   sending = false
 }: ActionButtonsProps) => {
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <Button onClick={onStart} disabled={!supported || isListening} className="gap-2">
-        {isListening ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
-        Iniciar
-      </Button>
-
-      <Button onClick={onStop} variant="outline" disabled={!isListening} className="gap-2">
-        <Square className="h-4 w-4" />
-        Detener
-      </Button>
-
-      <Button onClick={onClear} variant="ghost" className="gap-2 text-red-600 hover:text-red-700">
-        <Trash2 className="h-4 w-4" />
-        Limpiar
-      </Button>
-
-      {/* 🔽 nuevo botón */}
-      {onSendToNLP && (
-        <Button onClick={onSendToNLP} disabled={!canSend || sending} className="gap-2">
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          Enviar a NLP
+    <div className="flex flex-wrap items-center gap-2">
+      {isListening ? (
+        <Button onClick={onStop} variant="destructive">
+          <Square className="fill-current" />
+          Detener
+        </Button>
+      ) : (
+        <Button onClick={onStart} disabled={!supported}>
+          <Mic />
+          Iniciar
         </Button>
       )}
 
-      {isListening && (
-        <div className="flex items-center gap-2 text-sm text-blue-600">
-          <Waves className="h-4 w-4 animate-pulse" />
-          Habla ahora...
-        </div>
+      {onSendToNLP && (
+        <Button onClick={onSendToNLP} variant="outline" disabled={!canSend || sending}>
+          {sending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+          Interpretar
+        </Button>
       )}
+
+      <Button onClick={onClear} variant="ghost" className="ml-auto text-muted-foreground">
+        <RotateCcw />
+        Reiniciar
+      </Button>
     </div>
   )
 }

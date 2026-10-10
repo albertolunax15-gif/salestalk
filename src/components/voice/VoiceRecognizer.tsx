@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { AlertTriangle, Check, CheckCircle2, Loader2, Mic, Plus, Sparkles } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertCircle } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { RecognitionStatus } from "./RecognitionStatus";
@@ -269,20 +273,13 @@ export default function VoiceRecognizer({
       const productName = cands.find((c) => c.id === selectedProductId)?.name ?? nlpResult?.entities.product_name ?? "Producto";
 
       toast({
-        title: "Venta creada",
-        description: `${productName} • ${quantity} unid • ${paymentMethod}`,
+        variant: "success",
+        title: "Venta registrada",
+        description: `${productName} · ${quantity} u · ${paymentMethod}`,
       });
 
       // 👇 NUEVO: voz al crear con éxito
       try { speak(`Venta creada correctamente`); } catch {}
-
-      emitSaleCreated(sale);
-      onSaleCreated?.(sale);
-
-      // ✅ Mantener layout...
-      setLastSale(sale);
-      setJustConfirmed(true);
-      clear();
 
       emitSaleCreated(sale);
       onSaleCreated?.(sale);
@@ -309,193 +306,221 @@ export default function VoiceRecognizer({
     }
   };
 
-  // Footer de acciones (sticky) — permanece montado siempre para evitar saltos
-  const ConfirmFooter = ({
-    disabled,
-  }: {
-    disabled: boolean;
-  }) => {
-    return (
-      <div
-        className="sticky bottom-0 z-10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80
-                   border-t h-16 flex items-center gap-2"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
-        {justConfirmed ? (
-          <>
-            <Button variant="secondary" className="w-full sm:w-auto" onClick={resetForm}>
-              Nueva venta
-            </Button>
-            {onClose && (
-              <Button className="w-full sm:w-auto" onClick={onClose}>
-                Cerrar
-              </Button>
-            )}
-          </>
-        ) : (
-          <Button className="w-full sm:w-auto" onClick={handleConfirm} disabled={disabled}>
-            {confirming ? "Confirmando..." : "Confirmar venta"}
-          </Button>
-        )}
-      </div>
-    );
-  };
-
-  // Panel de confirmación (contenido; el footer siempre está)
-  const confirmPanelBody = useMemo(() => {
-    if (!nlpResult || nlpResult.intent !== "crear_venta") return null;
-
-    const needs = Boolean(nlpResult.needs_confirmation) || !nlpResult.entities.product_id;
-    const cands: Candidate[] = nlpResult.candidates ?? nlpResult.entities._candidates ?? [];
-    const q = nlpResult.entities.quantity ?? 1;
-    const pmDisplay = nlpResult.entities.payment_method ?? normalizePaymentMethod(undefined);
-
-    return (
-      <div className="space-y-3">
-        {/* Estado después de confirmar, mostramos un pequeño resumen */}
-        {justConfirmed && lastSale && (
-          <div className="p-2 rounded bg-green-50 text-green-800 text-sm">
-            Venta #{lastSale.id.slice(0, 8)} creada correctamente.
-          </div>
-        )}
-
-        <div className="text-sm">
-          <strong>Resumen:</strong> {q} unidad(es) — Pago: {pmDisplay}
-        </div>
-
-        {needs ? (
-          <>
-            <div className="text-sm">Selecciona el producto detectado:</div>
-            <select
-              className="w-full border rounded p-2 text-sm"
-              value={selectedProductId ?? ""}
-              onChange={(e) => setSelectedProductId(e.target.value || null)}
-              disabled={justConfirmed}
-            >
-              <option value="">-- Elegir producto --</option>
-              {cands.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {typeof c.score === "number" ? ` (score ${c.score})` : ""}
-                </option>
-              ))}
-            </select>
-          </>
-        ) : (
-          <div className="text-sm">
-            Producto: <span className="font-medium">{nlpResult.entities.product_name ?? "—"}</span>
-          </div>
-        )}
-
-        {confirmError && <div className="text-sm text-red-700 bg-red-50 p-2 rounded">{confirmError}</div>}
-      </div>
-    );
-  }, [nlpResult, selectedProductId, confirmError, justConfirmed, lastSale]);
+  // Datos derivados de la interpretación
+  const isSale = nlpResult?.intent === "crear_venta";
+  const cands: Candidate[] = nlpResult?.candidates ?? nlpResult?.entities._candidates ?? [];
+  const needsProduct = Boolean(nlpResult && (nlpResult.needs_confirmation || !nlpResult.entities.product_id));
+  const confidencePct = Math.round((nlpResult?.confidence ?? 0) * 100);
+  const canConfirm = isSale && !confirming && Boolean(selectedProductId) && !justConfirmed;
 
   return (
-    <Card className={`bg-white shadow-lg ${className ?? ""} w-full max-w-full h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden`}>
-      <CardHeader className="border-b p-3 shrink-0">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <CardTitle className="text-lg md:text-xl font-semibold">{title}</CardTitle>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="flex-1 sm:flex-none">
-              <LanguageSelector lang={lang} languages={languages} onLanguageChange={setLang} />
-            </div>
-            <RecognitionStatus supported={supported} isListening={isListening} />
+    <div className={cn("flex h-full min-h-0 w-full flex-col bg-card", className)}>
+      {/* Encabezado */}
+      <header className="flex shrink-0 flex-col gap-3 border-b px-5 py-4 pr-12 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="flex size-9 items-center justify-center rounded-lg bg-accent">
+            <Mic className="size-4 text-accent-foreground" />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-foreground">{title}</h2>
+            <p className="text-xs text-muted-foreground">Dicta, revisa y confirma</p>
           </div>
         </div>
-      </CardHeader>
+        <div className="flex items-center gap-2">
+          <div className="w-44">
+            <LanguageSelector lang={lang} languages={languages} onLanguageChange={setLang} />
+          </div>
+          <RecognitionStatus supported={supported} isListening={isListening} />
+        </div>
+      </header>
 
-      <CardContent className="p-4 flex-1 min-h-0 overflow-hidden">
-        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-4 h-full">
-          {/* Izquierda: Controles y transcripción */}
-          <div className="flex flex-col gap-3 min-h-0 lg:minh-full">
-            <div className="shrink-0">
-              <ActionButtons
-                supported={supported}
-                isListening={isListening}
-                onStart={start}
-                onStop={stop}
-                onClear={() => {
-                  resetForm();
-                }}
-                onSendToNLP={handleSendToNLP}
-                canSend={canSend}
-                sending={sending}
-              />
-            </div>
+      {/* Cuerpo */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-2 lg:overflow-hidden">
+        {/* Paso 1: dictado */}
+        <section aria-labelledby="step-dictate" className="flex min-h-0 flex-col gap-4 border-b p-5 lg:border-b-0 lg:border-r">
+          <StepTitle id="step-dictate" n={1} title="Dicta la venta" />
 
-            {!supported && (
-              <div className="text-sm text-red-600 p-3 bg-red-50 rounded-md flex items-center gap-2 shrink-0">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                Tu navegador/entorno no permite Web Speech API. Usa Chrome/Edge en escritorio y HTTPS (o localhost).
-              </div>
+          <ActionButtons
+            supported={supported}
+            isListening={isListening}
+            onStart={start}
+            onStop={stop}
+            onClear={resetForm}
+            onSendToNLP={handleSendToNLP}
+            canSend={canSend}
+            sending={sending}
+          />
+
+          {!supported && (
+            <ErrorDisplay errorMsg="Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge en escritorio, con HTTPS o localhost." />
+          )}
+          <ErrorDisplay errorMsg={errorMsg} />
+
+          <div
+            className={cn(
+              "min-h-[140px] flex-1 overflow-y-auto rounded-lg border bg-background p-4 transition-colors overscroll-contain lg:min-h-0",
+              isListening && "border-primary/50 ring-[3px] ring-primary/10"
             )}
-
-            <div
-              className="flex-1 min-h-[200px] lg:min-h-[280px] overflow-y-auto overflow-x-hidden rounded border bg-white p-3 space-y-2 overscroll-contain touch-pan-y"
-              tabIndex={0}
-            >
-              <ErrorDisplay errorMsg={errorMsg} />
-              {confidence !== null && (
-                <div className="text-xs text-gray-500">Confianza última frase: {(confidence * 100).toFixed(1)}%</div>
-              )}
-              <TranscriptDisplay finalText={finalText} interimText={interim} />
-            </div>
-
-            <div className="text-xs text-gray-500 p-2 bg-blue-50 rounded-md shrink-0">
-              <strong>Consejo:</strong> Ejecuta en HTTPS (o localhost). En Brave, desactiva <em>Shields</em> o usa Chrome/Edge.
-            </div>
+            tabIndex={0}
+            aria-label="Transcripción"
+          >
+            <TranscriptDisplay finalText={finalText} interimText={interim} />
           </div>
 
-          {/* Derecha: Resultado NLP */}
-          <div className="flex flex-col min-h-0 lg:min-h-full">
-            <div
-              className="flex-1 min-h-[200px] lg:min-h-[280px] overflow-y-auto overflow-x-hidden rounded border bg-white p-3 overscroll-contain touch-pan-y pb-28 sm:pb-8"
-              style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
-              tabIndex={0}
-            >
-              {nlpError && <div className="mb-3 p-3 rounded bg-red-50 text-red-700 text-sm">{nlpError}</div>}
+          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+            <span>
+              {confidence !== null ? `Confianza de reconocimiento: ${(confidence * 100).toFixed(0)}%` : "Funciona mejor en Chrome o Edge."}
+            </span>
+          </div>
+        </section>
 
-              {!nlpResult ? (
-                <div className="text-sm text-gray-500">Envía el texto reconocido para interpretar la intención.</div>
-              ) : (
-                <div className="text-sm space-y-3">
-                  <div>
-                    <strong>Intent:</strong> {nlpResult.intent} ({Math.round((nlpResult.confidence ?? 0) * 100)}%)
-                  </div>
+        {/* Paso 2: revisión */}
+        <section aria-labelledby="step-review" className="flex min-h-0 flex-col gap-4 p-5 lg:overflow-y-auto">
+          <StepTitle id="step-review" n={2} title="Revisa y confirma" />
 
-                  <div>
-                    <strong>Entities:</strong>
-                    <pre
-                      className="mt-1 text-xs max-h-40 sm:max-h-48 border rounded bg-gray-50 p-2
-                                 overflow-x-auto overflow-y-auto overscroll-contain
-                                 touch-pan-x font-mono whitespace-pre"
-                      role="region"
-                      aria-label="Entities (scroll horizontal)"
-                      tabIndex={0}
-                    >
-                      {JSON.stringify(nlpResult.entities, null, 2)}
-                    </pre>
-                  </div>
+          {nlpError && <ErrorDisplay errorMsg={nlpError} />}
 
-                  {nlpResult.notes?.length > 0 && (
-                    <div className="text-amber-700">
-                      <strong>Notas:</strong> {nlpResult.notes.join(" • ")}
-                    </div>
-                  )}
-
-                  {/* Cuerpo del panel (inputs / mensajes) */}
-                  {confirmPanelBody}
+          {!nlpResult ? (
+            <div className="flex flex-1 flex-col items-center justify-center rounded-lg border border-dashed px-6 py-10 text-center">
+              <Sparkles className="mb-3 size-6 text-muted-foreground" />
+              <p className="text-sm font-medium text-foreground">Sin interpretación todavía</p>
+              <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                Cuando termines de dictar, presiona <span className="font-medium">Interpretar</span> para extraer producto, cantidad y método de pago.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {justConfirmed && lastSale && (
+                <div role="status" className="flex items-start gap-2 rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-foreground">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+                  <span>
+                    Venta <span className="font-mono text-xs">#{lastSale.id.slice(0, 8)}</span> registrada correctamente.
+                  </span>
                 </div>
               )}
-            </div>
 
-            {/* Footer sticky PERMANENTE (previene saltos de tamaño) */}
-            <ConfirmFooter disabled={confirming || !selectedProductId || (justConfirmed && !nlpResult)} />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+              <div className="flex items-center justify-between gap-3">
+                <Badge variant={isSale ? "default" : "secondary"}>{INTENT_LABELS[nlpResult.intent] ?? nlpResult.intent}</Badge>
+                <span className="text-xs text-muted-foreground tabular-nums">Confianza {confidencePct}%</span>
+              </div>
+
+              {isSale ? (
+                <>
+                  <dl className="grid grid-cols-2 gap-2">
+                    <Field label="Cantidad">{nlpResult.entities.quantity ?? 1} u</Field>
+                    <Field label="Método de pago">{normalizePaymentMethod(nlpResult.entities.payment_method)}</Field>
+                    {!needsProduct && (
+                      <div className="col-span-2">
+                        <Field label="Producto">{nlpResult.entities.product_name ?? "—"}</Field>
+                      </div>
+                    )}
+                  </dl>
+
+                  {needsProduct && (
+                    <div className="space-y-2">
+                      <Label htmlFor="voice-product">Producto</Label>
+                      <Select
+                        id="voice-product"
+                        value={selectedProductId ?? ""}
+                        onChange={(e) => setSelectedProductId(e.target.value || null)}
+                        disabled={justConfirmed}
+                      >
+                        <option value="">Selecciona el producto…</option>
+                        {cands.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                            {typeof c.score === "number" ? ` (${Math.round(c.score * (c.score <= 1 ? 100 : 1))}%)` : ""}
+                          </option>
+                        ))}
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        {cands.length > 0
+                          ? "Encontramos varias coincidencias; elige la correcta."
+                          : "No identificamos el producto. Vuelve a dictar mencionando su nombre."}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Esta instrucción no corresponde a una venta. Dicta una venta para continuar.
+                </p>
+              )}
+
+              {nlpResult.notes?.length > 0 && (
+                <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-foreground">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-foreground dark:text-warning" />
+                  <ul className="space-y-0.5">
+                    {nlpResult.notes.map((n, i) => (
+                      <li key={i}>{n}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {confirmError && <ErrorDisplay errorMsg={confirmError} />}
+
+              <details className="group rounded-lg border text-xs">
+                <summary className="cursor-pointer select-none px-3 py-2 text-muted-foreground hover:text-foreground">
+                  Ver datos técnicos
+                </summary>
+                <pre className="max-h-48 overflow-auto border-t bg-muted/50 p-3 font-mono">
+                  {JSON.stringify(nlpResult.entities, null, 2)}
+                </pre>
+              </details>
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* Pie de acciones */}
+      <footer
+        className="flex shrink-0 items-center justify-end gap-2 border-t bg-muted/30 px-5 py-3"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
+        {onClose && (
+          <Button variant="outline" onClick={onClose}>
+            {justConfirmed ? "Cerrar" : "Cancelar"}
+          </Button>
+        )}
+        {justConfirmed ? (
+          <Button onClick={resetForm}>
+            <Plus />
+            Nueva venta
+          </Button>
+        ) : (
+          <Button onClick={handleConfirm} disabled={!canConfirm}>
+            {confirming ? <Loader2 className="animate-spin" /> : <Check />}
+            Confirmar venta
+          </Button>
+        )}
+      </footer>
+    </div>
+  );
+}
+
+const INTENT_LABELS: Record<NLPInterpretResponse["intent"], string> = {
+  crear_venta: "Registrar venta",
+  listar_ventas: "Consultar ventas",
+  ayuda: "Ayuda",
+};
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border bg-background px-3 py-2.5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 truncate text-sm font-medium text-foreground">{children}</dd>
+    </div>
+  );
+}
+
+function StepTitle({ id, n, title }: { id: string; n: number; title: string }) {
+  return (
+    <h3 id={id} className="flex items-center gap-2 text-sm font-semibold text-foreground">
+      <span className="flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+        {n}
+      </span>
+      {title}
+    </h3>
   );
 }

@@ -1,3 +1,4 @@
+import { Select } from "@/components/ui/select"
 import { Language } from "./VoiceRecognizer"
 
 type LanguageSelectorProps = {
@@ -8,15 +9,15 @@ type LanguageSelectorProps = {
 
 export const LanguageSelector = ({ lang, languages, onLanguageChange }: LanguageSelectorProps) => {
   return (
-    <select
+    <Select
       value={lang}
       onChange={(e) => onLanguageChange(e.target.value)}
-      className="border rounded-md px-2 py-1 text-sm"
-      title="Idioma de reconocimiento"
+      aria-label="Idioma de reconocimiento"
+      className="h-8 text-xs"
     >
       {languages.map((l) => (
         <option key={l.code} value={l.code}>{l.name}</option>
       ))}
-    </select>
+    </Select>
   )
 }

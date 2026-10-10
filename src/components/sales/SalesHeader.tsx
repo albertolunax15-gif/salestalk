@@ -1,58 +1,55 @@
 "use client"
 
-import { useState } from "react"
+import { Mic } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import { PageHeader } from "@/components/shared/PageHeader"
 import VoiceRecognizer from "../voice/VoiceRecognizer"
 
 interface SalesHeaderProps {
   title?: string
   description?: string
+  voiceOpen: boolean
+  onVoiceOpenChange: (open: boolean) => void
+}
+
+export function VoiceSaleButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button onClick={onClick}>
+      <Mic />
+      Registrar venta por voz
+    </Button>
+  )
 }
 
 export const SalesHeader = ({
-  title = "Gestión de Ventas",
-  description = ""
+  title = "Ventas",
+  description = "Historial de ventas registradas. Usa el asistente de voz para registrar nuevas.",
+  voiceOpen,
+  onVoiceOpenChange,
 }: SalesHeaderProps) => {
-  const [open, setOpen] = useState(false)
-
   return (
-    <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-      {/* Texto principal */}
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">{title}</h1>
-        {description && (
-          <p className="text-sm text-gray-500 mt-1">{description}</p>
-        )}
-      </div>
+    <>
+      <PageHeader
+        title={title}
+        description={description}
+        actions={<VoiceSaleButton onClick={() => onVoiceOpenChange(true)} />}
+      />
 
-      {/* Botón que abre el modal */}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-            Abrir Reconocedor de Voz
-          </Button>
-        </DialogTrigger>
-
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Reconocimiento de Voz</DialogTitle>
-          </DialogHeader>
-          {/* Aquí insertamos tu componente */}
+      <Dialog open={voiceOpen} onOpenChange={onVoiceOpenChange}>
+        <DialogContent className="flex h-[min(760px,calc(100dvh-2rem))] max-w-5xl flex-col gap-0 overflow-hidden p-0">
+          <DialogTitle className="sr-only">Asistente de ventas por voz</DialogTitle>
+          <DialogDescription className="sr-only">
+            Dicta la venta, revisa la interpretación y confírmala.
+          </DialogDescription>
           <VoiceRecognizer
-            title="Asistente de Ventas por Voz"
+            title="Asistente de ventas por voz"
             initialLang="es-PE"
-            onFinalText={(text) => console.log("Texto final:", text)}
-            onInterimText={(text) => console.log("Texto en vivo:", text)}
+            onClose={() => onVoiceOpenChange(false)}
           />
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }
